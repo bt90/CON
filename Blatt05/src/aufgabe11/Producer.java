@@ -8,17 +8,14 @@ import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ExecutorService;
 
 public class Producer implements Runnable {
 	private final Path start;
-	private final BlockingQueue<Path> queue;
-	private final ExecutorService consumerExec;
+	private final BlockingQueue<PathWrapper> queue;
 	
-	public Producer(Path start, BlockingQueue<Path> queue, ExecutorService consumerExec) {
+	public Producer(Path start, BlockingQueue<PathWrapper> queue) {
 		this.start = start;
 		this.queue = queue;
-		this.consumerExec = consumerExec;
 	}
 
 	@Override
@@ -27,10 +24,13 @@ public class Producer implements Runnable {
 
 		try {
 			Files.walkFileTree(start, visitor);
+			
+			// signal consumers
+			queue.put(new PathWrapper(null));
 		} catch (IOException e) {
 			e.printStackTrace();
-		} finally {
-			consumerExec.shutdown();
+		} catch (InterruptedException e) {
+			e.printStackTrace();
 		}
 	}
 
@@ -38,7 +38,7 @@ public class Producer implements Runnable {
 		@Override
 		public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
 			try {
-				queue.put(file);
+				queue.put(new PathWrapper(file));
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}
